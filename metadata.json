@@ -1,0 +1,6 @@
+{
+  "name": "AG HIKING Pro",
+  "description": "Professional outdoor GPS navigation, offline topo maps, track recording, GPX import/export, and elevation profile for hiking and mountaineering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
