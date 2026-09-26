@@ -45,6 +45,11 @@ fun HomeScreen(
     val tracks by viewModel.allTracks.collectAsState()
 
     val currentPoint = gpsState.point
+    val targetDest by viewModel.targetDestination.collectAsState()
+    val directDistance by viewModel.directDistanceToTargetMeters.collectAsState()
+    val targetBearing by viewModel.bearingToTargetDegrees.collectAsState()
+    val elevDelta by viewModel.elevationDeltaToTarget.collectAsState()
+    val etaMinutes by viewModel.etaToTargetMinutes.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -262,6 +267,66 @@ fun HomeScreen(
                             text = "Menunggu koordinat satelit GPS pertama...",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        // Target Destination & Live Distance HUD
+        if (targetDest != null) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToMap() }
+                        .testTag("home_target_destination_card")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Flag,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "TUJUAN: ${targetDest?.name}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            val distKm = (directDistance ?: 0.0) / 1000.0
+                            val bearingDeg = targetBearing?.toInt() ?: 0
+                            val cardinal = GeoUtils.bearingToCardinal(targetBearing ?: 0f)
+                            val elevStr = if (elevDelta != null) (if (elevDelta!! >= 0) "+${elevDelta!!.toInt()}m" else "${elevDelta!!.toInt()}m") else "-"
+                            val etaStr = etaMinutes?.let { if (it >= 60) "${it / 60}j ${it % 60}m" else "$it mnt" } ?: "-"
+                            Text(
+                                text = "Jarak: %.2f km • Arah: %s (%d°) • Elev: %s • ETA: %s".format(
+                                    distKm, cardinal, bearingDeg, elevStr, etaStr
+                                ),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Buka Peta",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }

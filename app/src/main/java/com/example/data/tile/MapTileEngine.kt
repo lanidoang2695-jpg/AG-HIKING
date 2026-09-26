@@ -65,6 +65,10 @@ class MapTileEngine(private val context: Context) {
         }
     }
 
+    fun getFromMemoryCache(layer: MapLayerType, z: Int, x: Int, y: Int): Bitmap? {
+        return memoryCache.get("${layer.name}_${z}_${x}_${y}")
+    }
+
     private fun getTileFile(layer: MapLayerType, z: Int, x: Int, y: Int): File {
         val dir = File(tilesBaseDir, "${layer.name}/$z/$x")
         if (!dir.exists()) dir.mkdirs()

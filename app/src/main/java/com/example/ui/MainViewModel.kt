@@ -32,6 +32,14 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.InputStream
 
+data class TargetDestination(
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val altitudeMeters: Double,
+    val typeName: String = "Puncak"
+)
+
 data class MapMeasureState(
     val isMeasuringDistance: Boolean = false,
     val isMeasuringArea: Boolean = false,
@@ -84,10 +92,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val mapBearing = MutableStateFlow(0f)
     val followGps = MutableStateFlow(true)
 
-    // Active Navigation
+    // Active Navigation & Target Destination
     val selectedRouteForNavigation = MutableStateFlow<RouteEntity?>(null)
     val navigationState = MutableStateFlow(NavigationState())
     val offRouteToleranceMeters = MutableStateFlow(30.0) // 10m, 25m, 50m, 100m
+
+    // Target Destination (Distance to Destination)
+    val targetDestination = MutableStateFlow<TargetDestination?>(
+        TargetDestination(
+            name = "Puncak Gn. Bawakaraeng",
+            latitude = -5.2853,
+            longitude = 119.9688,
+            altitudeMeters = 2830.0,
+            typeName = "Puncak"
+        )
+    )
+    val directDistanceToTargetMeters = MutableStateFlow<Double?>(null)
+    val bearingToTargetDegrees = MutableStateFlow<Float?>(null)
+    val elevationDeltaToTarget = MutableStateFlow<Double?>(null)
+    val etaToTargetMinutes = MutableStateFlow<Int?>(null)
 
     // Measurement Tool State
     val measureState = MutableStateFlow(MapMeasureState())
@@ -116,6 +139,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (followGps.value) {
                     mapCenterLat.value = point.latitude
                     mapCenterLon.value = point.longitude
+                }
+
+                // Update destination distance, bearing, elev delta, and ETA
+                val target = targetDestination.value
+                if (target != null) {
+                    val dist = GeoUtils.calculateDistanceMeters(point.latitude, point.longitude, target.latitude, target.longitude)
+                    val bearing = GeoUtils.calculateBearing(point.latitude, point.longitude, target.latitude, target.longitude)
+                    val elevDelta = target.altitudeMeters - point.altitude
+                    val speedMps = point.speed.coerceAtLeast(0.8f)
+                    val etaMin = ((dist / speedMps) / 60.0).toInt().coerceAtLeast(1)
+
+                    directDistanceToTargetMeters.value = dist
+                    bearingToTargetDegrees.value = bearing
+                    elevationDeltaToTarget.value = elevDelta
+                    etaToTargetMinutes.value = etaMin
                 }
 
                 // If currently following a route, calculate off-route and progress
@@ -223,6 +261,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (points.isNotEmpty()) {
             mapCenterLat.value = points.first().latitude
             mapCenterLon.value = points.first().longitude
+            val last = points.last()
+            setTargetDestination(
+                name = "Puncak ${route.name.substringBefore(" via")}",
+                lat = last.latitude,
+                lon = last.longitude,
+                alt = route.highestPointMeters,
+                type = "Puncak"
+            )
         }
         navigationState.value = NavigationState(
             isNavigating = true,
@@ -235,6 +281,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun stopNavigation() {
         selectedRouteForNavigation.value = null
         navigationState.value = NavigationState(isNavigating = false)
+    }
+
+    // Target Destination Management
+    fun setTargetDestination(name: String, lat: Double, lon: Double, alt: Double, type: String = "Tujuan") {
+        targetDestination.value = TargetDestination(name, lat, lon, alt, type)
+        gpsState.value.point?.let { pt ->
+            val dist = GeoUtils.calculateDistanceMeters(pt.latitude, pt.longitude, lat, lon)
+            val bearing = GeoUtils.calculateBearing(pt.latitude, pt.longitude, lat, lon)
+            val elevDelta = alt - pt.altitude
+            val speedMps = pt.speed.coerceAtLeast(0.8f)
+            val etaMin = ((dist / speedMps) / 60.0).toInt().coerceAtLeast(1)
+
+            directDistanceToTargetMeters.value = dist
+            bearingToTargetDegrees.value = bearing
+            elevationDeltaToTarget.value = elevDelta
+            etaToTargetMinutes.value = etaMin
+        }
+        userMessage.value = "Target tujuan diset: $name"
+    }
+
+    fun setTargetFromWaypoint(wpt: WaypointEntity) {
+        setTargetDestination(wpt.name, wpt.latitude, wpt.longitude, wpt.elevationMeters, wpt.type)
+    }
+
+    fun clearTargetDestination() {
+        targetDestination.value = null
+        directDistanceToTargetMeters.value = null
+        bearingToTargetDegrees.value = null
+        elevationDeltaToTarget.value = null
+        etaToTargetMinutes.value = null
+        userMessage.value = "Target tujuan dinonaktifkan"
+    }
+
+    fun zoomIn() {
+        mapZoom.value = (mapZoom.value + 1.0).coerceAtMost(18.5)
+    }
+
+    fun zoomOut() {
+        mapZoom.value = (mapZoom.value - 1.0).coerceAtLeast(3.0)
+    }
+
+    fun recenterGps() {
+        gpsState.value.point?.let { pt ->
+            mapCenterLat.value = pt.latitude
+            mapCenterLon.value = pt.longitude
+            followGps.value = true
+        }
     }
 
     // Import GPX / KML / GeoJSON from Stream

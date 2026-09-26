@@ -16,10 +16,11 @@ class AgHikingApplication : Application() {
             try {
                 val routes = db.routeDao().getAllRoutes().first()
                 if (routes.isEmpty()) {
-                    val (sampleRoute, waypoints) = SampleRouteData.getSampleRoute()
-                    val routeId = db.routeDao().insertRoute(sampleRoute)
-                    val waypointsWithId = waypoints.map { it.copy(routeId = routeId) }
-                    db.waypointDao().insertWaypoints(waypointsWithId)
+                    for ((route, waypoints) in SampleRouteData.getAllVerifiedRoutes()) {
+                        val routeId = db.routeDao().insertRoute(route)
+                        val waypointsWithId = waypoints.map { it.copy(routeId = routeId) }
+                        db.waypointDao().insertWaypoints(waypointsWithId)
+                    }
                 }
             } catch (_: Exception) {}
         }
